@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
 
 
-chapterdict = {
+chapterdict = { #CHANGE THIS DICTIONARY FOR OTHER BOOKS
     1: [1195427,"A New Beginning"],
     2: [1195430,"Jackpot"],
     3: [1195435,"The First Step"],
@@ -102,6 +102,29 @@ def main():
     book.set_title('Elydes Book 1')
     book.set_language('en')
 
+
+    cover_url = 'https://www.royalroad.com/fiction/67742/ely' #CHANGE THIS URL FOR OTHER BOOKS
+    response = requests.get(cover_url)
+    html_content = response.text
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    img_elem = soup.find(class_='thumbnail inline-block')
+
+    # Extract the URL of the image
+    if img_elem and 'src' in img_elem.attrs:
+        img_url = img_elem['src']
+        img_response = requests.get(img_url)
+        if img_response.status_code == 200:
+            cover_image = img_response.content
+            print("Image Found")
+        else:
+            print("Failed to download image:", img_url)
+    else:
+        print("No image found on the webpage.")
+
+
+    book.set_cover('cover.jpg', cover_image)
+
     # Add author
     book.add_author('Drewells')
 
@@ -110,7 +133,7 @@ def main():
     for i in range (1,60):
         chaplist = chapterdict.get(i)
         iden = chaplist[0]
-        url = f'https://www.royalroad.com/fiction/67742/elydes/chapter/{iden}/c'
+        url = f'https://www.royalroad.com/fiction/67742/elydes/chapter/{iden}/c' #CHANGE THIS URL FOR OTHER BOOKS
         toc.append(epub.Link(f'chap_{i}.xhtml',chaplist[1],f'chapter_{i}'))
         content = fetch_text(url,i)
         chap = create_chap(book,content,i)
