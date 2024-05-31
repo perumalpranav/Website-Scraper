@@ -100,7 +100,7 @@ def main():
     book.spine = ['nav']
     for i in range (1,numChaps):          
         if i == 1:
-            starturl = 'https://www.royalroad.com/fiction/67742/elydes-book-1-stubs-on-june-11/chapter/1195427/chapter-1-a-new-beginning' #START CHAPTER URL
+            url = starturl
         contentlist = fetch_text(url,i)
         toc.append(epub.Link(f'chap_{i}.xhtml',contentlist[0],f'chapter_{i}'))
         chap = create_chap(book,contentlist,i)
