@@ -1,14 +1,12 @@
 #!/usr/bin/python3
 
 """
-Translates MTL novels to readable English
-
+Translates MTL novels to readable English, and saves final product as epub
 """
 
 import requests  # For sending HTTP requests and receiving HTTP responses
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
-import re
 
 #CHANGE THIS ID FOR OTHER BOOKS
 idstring = input("What's the idstring: ")
@@ -78,6 +76,10 @@ def create_chap(book,contentlist,i):
     book.add_item(chapter)
     return chapter
 
+#Function to clean up the MTL English using an LLM
+def grammar_police(contentlist):
+    return contentlist
+
 # Main function
 def main():
     book = epub.EpubBook()
@@ -116,7 +118,12 @@ def main():
     for i in range (1,numChaps):          
         if i == 1:
             url = starturl
+ 
         contentlist = fetch_text(url,i)
+
+        #contentlist = grammar_police(contentlist)
+
+
         toc.append(epub.Link(f'chap_{i}.xhtml',contentlist[0],f'chapter_{i}'))
         chap = create_chap(book,contentlist,i)
         book.spine.append(chap)
