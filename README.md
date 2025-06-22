@@ -83,7 +83,7 @@ A Python-based tool for scraping and converting serialized web novels from Royal
 1. **Clone the Repository** (if applicable):
 
    ```bash
-   git clone https://github.com/yourusername/royalroad-epub-downloader.git
+   git clone https://github.com/perumalpranav/royalroad-epub-downloader.git
    cd royalroad-epub-downloader
    ```
 
