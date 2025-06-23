@@ -7,6 +7,7 @@ Translates MTL novels to readable English, and saves final product as epub
 import requests  # For sending HTTP requests and receiving HTTP responses
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
+import ollama
 
 #CHANGE THIS ID FOR OTHER BOOKS
 idstring = input("What's the idstring: ")
@@ -78,6 +79,31 @@ def create_chap(book,contentlist,i):
 
 #Function to clean up the MTL English using an LLM
 def grammar_police(contentlist):
+    #Bootup Ollama (we are using a locally downloaded deepseek r1 instance with 8b parameters)
+    """
+    Example:
+    response = ollama.chat(
+        model='deepseek-r1:8b',
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a bilingual editor. Your task is to improve sloppy English translations "
+                    "by comparing them with the original Chinese text. Make the English natural, fluent, "
+                    "and faithful to the meaning in Chinese."
+                )
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Original Chinese: 他昨天去了市场。\n"
+                    "Machine Translated English: He go to market yesterday."
+                )
+            }
+        ]
+    )
+    """
+
     return contentlist
 
 # Main function
