@@ -8,19 +8,8 @@ import requests  # For sending HTTP requests and receiving HTTP responses
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
 import ollama
-
-#CHANGE THIS ID FOR OTHER BOOKS
-idstring = input("What's the idstring: ")
-# CHANGE THIS TITLE FOR OTHER BOOKS
-booktitle = input("What's the title: ")
-#CHANGE THIS URL FOR OTHER BOOKS
-cover_url = input("Give me the cover URL: ")
-#CHANGE NUMBER OF CHAPTERS
-numChaps = int(input("How may chapters are we downloading(+1): "))
-#START CHAPTER URL
-starturl = input("What's the url for the first chapter: ")
-#CHANGE THIS FILENAME FOR OTHER BOOKS
-bookFile = input("What do you want the filename to be: ")
+import sys
+import uuid
 
 
 # Function to fetch text from a given URL
@@ -108,69 +97,75 @@ def grammar_police(contentlist):
 
 # Main function
 def main():
+    #-------------- START ---------------
+    home_url = input("What's the homepage URL (novelbin): ")
+    bookFile = input("What do you want the filename to be: ")
+    response = requests.get(home_url)
+    html_content = response.text
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    
+
+
+    #ADD ALL THE ERROR HANDLING
+
+
     book = epub.EpubBook()
 
-    # Set metadata
-    book.set_identifier(idstring)
-    book.set_title(booktitle) 
+    #-------------- Set Metadata --------------
+    book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
     book.set_language('en')
 
-    response = requests.get(cover_url)
-    html_content = response.text
+    #-------------- Set Title --------------
+    title_elem = soup.find(name='h3', class_='title')
+    book.set_title(title_elem.text) 
 
-    soup = BeautifulSoup(html_content, 'html.parser')
-    img_elem = soup.find(class_='thumbnail inline-block')
-
-    # Extract the URL of the image
-    if img_elem and 'src' in img_elem.attrs:
-        img_url = img_elem['src']
-        img_response = requests.get(img_url)
-        if img_response.status_code == 200:
-            cover_image = img_response.content
-            print("Image Found")
-        else:
-            print("Failed to download image:", img_url)
+    #-------------- Set Cover Image --------------
+    img_elem = soup.find(name='img', class_='lazy')
+    response = requests.get(img_elem.get('src'))
+    if response.status_code == 200:
+        cover_image = response.content
+        print("Image Found")
+        book.set_cover('cover.jpg', cover_image)
     else:
-        print("No image found on the webpage.")
+        print("Failed to download image:", img_elem.get('src'))
+    
+    #-------------- Set Author --------------
+    author_elem = soup.find(name='h3', string='Author:').find_next('a')
+    book.add_author(author_elem.text)
 
-
-    book.set_cover('cover.jpg', cover_image)
-
-    # Add author
-    book.add_author('Perumal')
-
+    #-------------- Build the Chapters --------------
     toc = []
     book.spine = ['nav']
-    for i in range (1,numChaps):          
-        if i == 1:
-            url = starturl
- 
+
+    next_chapter = soup.find(name='a', class_='btn-read-now').get('src')
+    i = 1
+    while not next_chapter == None:
+        ###IGNORE FOR NOW
         contentlist = fetch_text(url,i)
-
         #contentlist = grammar_police(contentlist)
-
-
         toc.append(epub.Link(f'chap_{i}.xhtml',contentlist[0],f'chapter_{i}'))
         chap = create_chap(book,contentlist,i)
         book.spine.append(chap)
+
+        i += 1
         url = contentlist[2]
+        ###IGNORE FOR NOW
 
 
-    # Define Table of Contents
+    #-------------- Define Table of Contents --------------
     book.toc = tuple(toc)
 
-    # Add default NCX and Nav file
+    #Add default NCX and Nav file
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
 
-    # Define CSS style
+    #-------------- Define CSS style --------------
     style = 'body { font-family: Times, Times New Roman, serif; }'
     nav_css = epub.EpubItem(uid='style_nav', file_name='style/nav.css', media_type='text/css', content=style)
-
-    # Add CSS file
     book.add_item(nav_css)
 
-    # Write to the file
+    #-------------- Write to file --------------
     epub.write_epub(bookFile, book, {})  
 
     print("Mission Complete");
