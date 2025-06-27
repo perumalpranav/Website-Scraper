@@ -49,7 +49,8 @@ def fetch_text(url,i):
                 print("No next chapter found.")
 
             return result
-        
+        else:
+            print(f"The request failed with an error {response.status_code}, trying again...")
     sys.exit(1)
 
 #Function to clean up the MTL English using an LLM
@@ -85,11 +86,13 @@ def grammar_police(contentlist):
 def main():
     #-------------- START ---------------
     home_url = input("What's the homepage URL (novelbin): ")
-    bookFile = input("What do you want the filename to be: ")
     response = requests.get(home_url)
+    if response != 200:
+        print(f"The request failed with an error {response.status_code}")
+        sys.exit(1)
     html_content = response.text
     soup = BeautifulSoup(html_content, 'html.parser')
-
+    bookFile = input("What do you want the filename to be: ")
     
 
     """NEED TO ADD ALL THE ERROR HANDLING"""
@@ -97,13 +100,25 @@ def main():
 
     book = epub.EpubBook()
 
+    print(soup.prettify())
+
     #-------------- Set Metadata --------------
     book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
     book.set_language('en')
 
     #-------------- Set Title --------------
     title_elem = soup.find(name='h3', class_='title')
-    book.set_title(title_elem.text) 
+    if title_elem is None:
+        ans = input("TITLE NOT FOUND, would you like to manually enter it (Y/N): ")
+        if ans == 'y' or ans == 'Y':
+            title = input("Enter Book Title: ")
+        else:
+            print("Quitting...")
+            sys.exit(0)
+    else:
+        title = title_elem.text
+
+    book.set_title(title) 
 
     #-------------- Set Cover Image --------------
     img_elem = soup.find(name='img', class_='lazy')
@@ -113,7 +128,7 @@ def main():
         print("Image Found")
         book.set_cover('cover.jpg', cover_image)
     else:
-        print("Failed to download image:", img_elem.get('src'))
+        print(f"The request failed with an error {response.status_code}")
     
     #-------------- Set Author --------------
     author_elem = soup.find(name='h3', string='Author:').find_next('a')
