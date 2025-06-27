@@ -17,54 +17,40 @@ def fetch_text(url,i):
     #return ['Chapter Title','chapter content','URL of next chapter']
     result = ['','','']
 
-    while True:
-        print(f'Try Chapter {i}')
+    attempt = 0
+    while attempt < 5:
+        print(f'Trying Chapter {i}...')
         response = requests.get(url)
         if response.status_code == 200:
             page_content = response.content
             soup = BeautifulSoup(page_content, 'html.parser')
 
-            titleelem = soup.find(class_='font-white break-word') #find chapter title element
+            titleelem = soup.find(name='a', class_='chr-title') #find chapter title element
             if titleelem:
-                result[0] = titleelem.text
+                result[0] = titleelem.get('title')
             else:
                 result[0] = f'Chapter {i}'
 
 
-            bodyelem = soup.find(class_='chapter-inner chapter-content')
+            bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
             if bodyelem:
                 print(f'Chapter {i} has been found')
                 inner_html = str(bodyelem)
                 result[1] = inner_html
             else:
-                print(f'ALERT ALERT Chapter {i} has NOT been found')
-                result[1] = "Not Found"
+                print(f'ALERT ALERT Chapter {i} text has NOT been found')
+                continue
 
-            nelems = soup.find_all(class_='btn btn-primary col-xs-12')
-            for n in nelems:
-                if(n.text.strip() == "Next Chapter"):
-                    nextelem = n
-                    break
-
-            if nextelem:
-                try:
-                    result[2] = "https://www.royalroad.com" + nextelem['href']  #CHANGE THIS FOR OTHER WEBSITES
-                except KeyError:
-                    result[2] = "bad url"
+            next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
+            if next_chap_button:
+                result[2] = next_chap_button.get('href')
             else:
-                print("NEXT CHAPTER FAILED")
+                result = None 
+                print("No next chapter found.")
 
             return result
-
-# Function to create chapter in epub book
-def create_chap(book,contentlist,i):
-    title = contentlist[0]
-    content = contentlist[1]
-    fname = 'chap_' + str(i) + '.xhtml'
-    chapter = epub.EpubHtml(title=title, file_name=fname, lang='en')
-    chapter.content = f'<h1>{title}</h1><p>{content}</p>'
-    book.add_item(chapter)
-    return chapter
+        
+    sys.exit(1)
 
 #Function to clean up the MTL English using an LLM
 def grammar_police(contentlist):
@@ -106,8 +92,7 @@ def main():
 
     
 
-
-    #ADD ALL THE ERROR HANDLING
+    """NEED TO ADD ALL THE ERROR HANDLING"""
 
 
     book = epub.EpubBook()
@@ -138,19 +123,24 @@ def main():
     toc = []
     book.spine = ['nav']
 
-    next_chapter = soup.find(name='a', class_='btn-read-now').get('src')
+    next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
     i = 1
     while not next_chapter == None:
-        ###IGNORE FOR NOW
+        #-------------- Get Chapter & Next Link --------------
         contentlist = fetch_text(url,i)
         #contentlist = grammar_police(contentlist)
+
+        #-------------- Create a chapter --------------
         toc.append(epub.Link(f'chap_{i}.xhtml',contentlist[0],f'chapter_{i}'))
-        chap = create_chap(book,contentlist,i)
-        book.spine.append(chap)
+        title = contentlist[0]
+        content = contentlist[1]
+        chapter = epub.EpubHtml(title=title, file_name=f'chap_{i}.xhtml', lang='en')
+        chapter.content = f'<div>{content}</div>'
+        book.add_item(chapter)
+        book.spine.append(chapter)
 
         i += 1
         url = contentlist[2]
-        ###IGNORE FOR NOW
 
 
     #-------------- Define Table of Contents --------------
