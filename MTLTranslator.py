@@ -97,7 +97,7 @@ def main():
         sys.exit(1)
     html_content = response.text
     soup = BeautifulSoup(html_content, 'html.parser')
-    bookFile = input("What do you want the filename to be: ")
+    bookFile = input("What do you want the filename to be (we will add the .epub, so no need for that): ")
     
 
     """NEED TO ADD ALL THE ERROR HANDLING"""
@@ -175,7 +175,7 @@ def main():
     book.add_item(nav_css)
 
     #-------------- Write to file --------------
-    epub.write_epub(bookFile, book, {})  
+    epub.write_epub(f"{bookFile}.epub", book, {})  
 
     print("Mission Complete");
     print("*Remember to move the file from this directory to downloads*")
