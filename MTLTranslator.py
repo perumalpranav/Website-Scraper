@@ -4,23 +4,24 @@
 Translates MTL novels to readable English, and saves final product as epub
 """
 
-import requests  # For sending HTTP requests and receiving HTTP responses
+import cloudscraper
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
 import ollama
 import sys
 import uuid
 
+scraper = cloudscraper.create_scraper()
 
 # Function to fetch text from a given URL
 def fetch_text(url,i):
     #return ['Chapter Title','chapter content','URL of next chapter']
     result = ['','','']
 
-    attempt = 0
-    while attempt < 5:
+    attempt = 1
+    while attempt < 4:
         print(f'Trying Chapter {i}...')
-        response = requests.get(url)
+        response = scraper.get(url)
         if response.status_code == 200:
             page_content = response.content
             soup = BeautifulSoup(page_content, 'html.parser')
@@ -38,19 +39,23 @@ def fetch_text(url,i):
                 inner_html = str(bodyelem)
                 result[1] = inner_html
             else:
-                print(f'ALERT ALERT Chapter {i} text has NOT been found')
+                attempt += 1
+                print(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
                 continue
 
             next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
-            if next_chap_button:
+            if next_chap_button and not next_chap_button.has_attr("disabled"):        
                 result[2] = next_chap_button.get('href')
             else:
-                result = None 
+                result[2] = None 
                 print("No next chapter found.")
 
             return result
         else:
-            print(f"The request failed with an error {response.status_code}, trying again...")
+            attempt += 1
+            print(f"The request failed with an error {response.status_code}, trying attempt {attempt}...")
+    
+    print("Failed 3 attempts, quitting now")
     sys.exit(1)
 
 #Function to clean up the MTL English using an LLM
@@ -86,9 +91,9 @@ def grammar_police(contentlist):
 def main():
     #-------------- START ---------------
     home_url = input("What's the homepage URL (novelbin): ")
-    response = requests.get(home_url)
-    if response != 200:
-        print(f"The request failed with an error {response.status_code}")
+    response = scraper.get(home_url)
+    if response.status_code != 200:
+        print(f"The request for the URL failed with an error {response.status_code}, {type(response.status_code)}")
         sys.exit(1)
     html_content = response.text
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -99,8 +104,6 @@ def main():
 
 
     book = epub.EpubBook()
-
-    print(soup.prettify())
 
     #-------------- Set Metadata --------------
     book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
@@ -122,13 +125,14 @@ def main():
 
     #-------------- Set Cover Image --------------
     img_elem = soup.find(name='img', class_='lazy')
-    response = requests.get(img_elem.get('src'))
+    print(img_elem)
+    response = scraper.get(img_elem.get('data-src')) #or 'src' depending on JS utilization
     if response.status_code == 200:
         cover_image = response.content
         print("Image Found")
         book.set_cover('cover.jpg', cover_image)
     else:
-        print(f"The request failed with an error {response.status_code}")
+        print(f"The request for the image failed with an error {response.status_code}")
     
     #-------------- Set Author --------------
     author_elem = soup.find(name='h3', string='Author:').find_next('a')
@@ -140,9 +144,9 @@ def main():
 
     next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
     i = 1
-    while not next_chapter == None:
+    while not next_chapter is None:
         #-------------- Get Chapter & Next Link --------------
-        contentlist = fetch_text(url,i)
+        contentlist = fetch_text(next_chapter,i)
         #contentlist = grammar_police(contentlist)
 
         #-------------- Create a chapter --------------
@@ -155,7 +159,7 @@ def main():
         book.spine.append(chapter)
 
         i += 1
-        url = contentlist[2]
+        next_chapter = contentlist[2]
 
 
     #-------------- Define Table of Contents --------------
