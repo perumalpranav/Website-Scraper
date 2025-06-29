@@ -8,6 +8,8 @@ import cloudscraper
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
 import ollama
+from PIL import Image
+from io import BytesIO
 import sys
 import uuid
 import re
@@ -150,8 +152,14 @@ def main():
     img_elem = soup.find(name='img', class_='lazy')
     response = scraper.get(img_elem.get('data-src')) #or 'src' depending on JS utilization
     if response.status_code == 200:
-        cover_image = response.content
-        book.set_cover('cover.jpg', cover_image)
+        image = Image.open(BytesIO(response.content)).convert("RGB")
+        image = image.resize((400, 600), Image.LANCZOS)
+
+        output = BytesIO()
+        image.save(output, format='JPEG')
+        output.seek(0)
+
+        book.set_cover('cover.jpg', output.read())
     else:
         print(f"The request for the image failed with an error {response.status_code}")
     
@@ -169,17 +177,22 @@ def main():
     latest_elem = soup.find(name='div', class_='l-chapter')
     pbar = None
     if latest_elem:
-        latest_link = latest_elem.find_next(name='a', class_='chapter-title').get('data-chapter_id')
-        if latest_link:
-            match = re.search(r'\d+', latest_link)
-            if match:
-                final_chap = int(match.group())
-                pbar = tqdm(total=final_chap)
-            else:
-                print("Last chapter number was not found, thus loading bar is unavailable")
+        latest_link_elem = latest_elem.find(name='a', class_='chapter-title')
+        if latest_link_elem is None:
+            print("Last chapter link was not found, thus loading bar is unavailable")
         else:
-            print("Latest Link not found, what follows is the latest element")
-            print(f"\n\n{latest_elem}")
+            attribute = 'title'
+            latest_link = latest_link_elem.get(attribute)
+            if latest_link:
+                match = re.search(r'\d+', latest_link)
+                if match:
+                    final_chap = int(match.group())
+                    pbar = tqdm(total=final_chap)
+                else:
+                    print("Last chapter number was not found, thus loading bar is unavailable")
+            else:
+                print(f"Latest chapter attribute (\'{attribute}\') not found, what follows is the latest element")
+                print(f"\n\n{latest_elem}")
     else:
         print("Latest element was not found, thus loading bar is unavailable")
 
@@ -222,7 +235,7 @@ def main():
     book.add_item(nav_css)
 
     #-------------- Write to file --------------
-    bookFile = title.replace(' ','_')
+    bookFile = book_title.replace(' ','_')
     epub.write_epub(f"{bookFile}.epub", book, {})
     
     overall_end = time.time() #End Overall Timer
