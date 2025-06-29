@@ -10,17 +10,23 @@ from ebooklib import epub
 import ollama
 import sys
 import uuid
+import re
+import time
+from tqdm import tqdm
 
 scraper = cloudscraper.create_scraper()
+delay_overall = 0
 
 # Function to fetch text from a given URL
 def fetch_text(url,i):
     #return ['Chapter Title','chapter content','URL of next chapter']
     result = ['','','']
+    global delay_overall
 
     attempt = 1
-    while attempt < 4:
-        print(f'Trying Chapter {i}...')
+    base_delay = 1
+    while attempt < 6:
+        tqdm.write(f'Trying Chapter {i}...')
         response = scraper.get(url)
         if response.status_code == 200:
             page_content = response.content
@@ -35,12 +41,12 @@ def fetch_text(url,i):
 
             bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
             if bodyelem:
-                print(f'Chapter {i} has been found')
+                tqdm.write(f'Chapter {i} has been found')
                 inner_html = str(bodyelem)
                 result[1] = inner_html
             else:
                 attempt += 1
-                print(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
+                tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
                 continue
 
             next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
@@ -48,14 +54,32 @@ def fetch_text(url,i):
                 result[2] = next_chap_button.get('href')
             else:
                 result[2] = None 
-                print("No next chapter found.")
+                tqdm.write("No next chapter found.")
 
             return result
+        elif response.status_code in (429, 503):
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                delay = int(retry_after)
+                tqdm.write(f"Server asked to retry after {delay} seconds...")
+            else:
+                delay = base_delay * (3 ** (attempt - 1))
+                tqdm.write(f"No 'Retry-After' header. Using exponential backoff: {delay} seconds...")
+
+            delay_start = time.time()
+            time.sleep(delay)
+            delay_end = time.time()
+            delay_overall += delay_end-delay_start
+            attempt += 1
+            tqdm.write(f"Trying attempt {attempt}...")
         else:
             attempt += 1
-            print(f"The request failed with an error {response.status_code}, trying attempt {attempt}...")
+            tqdm.write(f"The request failed with an error {response.status_code}, retrying immediately")
+
+            
+
     
-    print("Failed 3 attempts, quitting now")
+    tqdm.write(f"Failed {attempt} attempts, quitting now")
     sys.exit(1)
 
 #Function to clean up the MTL English using an LLM
@@ -97,10 +121,9 @@ def main():
         sys.exit(1)
     html_content = response.text
     soup = BeautifulSoup(html_content, 'html.parser')
-    bookFile = input("What do you want the filename to be (we will add the .epub, so no need for that): ")
     
 
-    """NEED TO ADD ALL THE ERROR HANDLING"""
+    """NEED TO CHECK ALL THE ERROR HANDLING"""
 
 
     book = epub.EpubBook()
@@ -119,17 +142,15 @@ def main():
             print("Quitting...")
             sys.exit(0)
     else:
-        title = title_elem.text
+        book_title = title_elem.text
 
-    book.set_title(title) 
+    book.set_title(book_title) 
 
     #-------------- Set Cover Image --------------
     img_elem = soup.find(name='img', class_='lazy')
-    print(img_elem)
     response = scraper.get(img_elem.get('data-src')) #or 'src' depending on JS utilization
     if response.status_code == 200:
         cover_image = response.content
-        print("Image Found")
         book.set_cover('cover.jpg', cover_image)
     else:
         print(f"The request for the image failed with an error {response.status_code}")
@@ -139,8 +160,29 @@ def main():
     book.add_author(author_elem.text)
 
     #-------------- Build the Chapters --------------
+    overall_start = time.time() #Start Overall Timer
+
     toc = []
     book.spine = ['nav']
+
+    #Find the Latest Chapter for the loading bar
+    latest_elem = soup.find(name='div', class_='l-chapter')
+    pbar = None
+    if latest_elem:
+        latest_link = latest_elem.find_next(name='a', class_='chapter-title').get('data-chapter_id')
+        if latest_link:
+            match = re.search(r'\d+', latest_link)
+            if match:
+                final_chap = int(match.group())
+                pbar = tqdm(total=final_chap)
+            else:
+                print("Last chapter number was not found, thus loading bar is unavailable")
+        else:
+            print("Latest Link not found, what follows is the latest element")
+            print(f"\n\n{latest_elem}")
+    else:
+        print("Latest element was not found, thus loading bar is unavailable")
+
 
     next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
     i = 1
@@ -159,7 +201,12 @@ def main():
         book.spine.append(chapter)
 
         i += 1
+        if pbar:
+            pbar.update(1)
         next_chapter = contentlist[2]
+
+    if pbar:
+        pbar.close()
 
 
     #-------------- Define Table of Contents --------------
@@ -175,10 +222,17 @@ def main():
     book.add_item(nav_css)
 
     #-------------- Write to file --------------
-    epub.write_epub(f"{bookFile}.epub", book, {})  
+    bookFile = title.replace(' ','_')
+    epub.write_epub(f"{bookFile}.epub", book, {})
+    
+    overall_end = time.time() #End Overall Timer
 
     print("Mission Complete");
-    print("*Remember to move the file from this directory to downloads*")
+
+    print(f"\nTotal time taken: {(overall_end-overall_start):.2f} seconds")
+    print(f"Time spent on delay: {delay_overall:.2f} seconds")
+
+    print("\n*Remember to move the file from this directory to downloads*")
 
 # Call the main function
 if __name__ == "__main__":
