@@ -5,6 +5,7 @@ Translates MTL novels to readable English, and saves final product as epub
 """
 
 import cloudscraper
+import requests
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
 import ollama
@@ -29,57 +30,73 @@ def fetch_text(url,i):
     base_delay = 1
     while attempt < 6:
         tqdm.write(f'Trying Chapter {i}...')
-        response = scraper.get(url)
-        if response.status_code == 200:
-            page_content = response.content
-            soup = BeautifulSoup(page_content, 'html.parser')
+        try: 
+            response = scraper.get(url, timeout=(5, 15))
+            if response.status_code == 200:
+                page_content = response.content
+                soup = BeautifulSoup(page_content, 'html.parser')
 
-            titleelem = soup.find(name='a', class_='chr-title') #find chapter title element
-            if titleelem:
-                result[0] = titleelem.get('title')
-            else:
-                result[0] = f'Chapter {i}'
+                titleelem = soup.find(name='a', class_='chr-title') #find chapter title element
+                if titleelem:
+                    result[0] = titleelem.get('title')
+                else:
+                    result[0] = f'Chapter {i}'
 
 
-            bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
-            if bodyelem:
-                tqdm.write(f'Chapter {i} has been found')
-                inner_html = str(bodyelem)
-                result[1] = inner_html
+                bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
+                if bodyelem:
+                    tqdm.write(f'Chapter {i} has been found')
+                    inner_html = str(bodyelem)
+                    result[1] = inner_html
+                else:
+                    attempt += 1
+                    tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
+                    continue
+
+                next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
+                if next_chap_button and not next_chap_button.has_attr("disabled"):        
+                    result[2] = next_chap_button.get('href')
+                else:
+                    result[2] = None 
+                    tqdm.write("No next chapter found.")
+
+                return result
+            elif response.status_code in (429, 503):
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
+                    delay = int(retry_after)
+                    tqdm.write(f"Server asked to retry after {delay} seconds...")
+                else:
+                    delay = base_delay * (3 ** (attempt - 1))
+                    tqdm.write(f"No 'Retry-After' header. Using exponential backoff: {delay} seconds...")
+
+                delay_start = time.time()
+                time.sleep(delay)
+                delay_end = time.time()
+                delay_overall += delay_end-delay_start
+                attempt += 1
+                tqdm.write(f"Trying attempt {attempt}...")
             else:
                 attempt += 1
-                tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
-                continue
-
-            next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
-            if next_chap_button and not next_chap_button.has_attr("disabled"):        
-                result[2] = next_chap_button.get('href')
-            else:
-                result[2] = None 
-                tqdm.write("No next chapter found.")
-
-            return result
-        elif response.status_code in (429, 503):
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                delay = int(retry_after)
-                tqdm.write(f"Server asked to retry after {delay} seconds...")
-            else:
-                delay = base_delay * (3 ** (attempt - 1))
-                tqdm.write(f"No 'Retry-After' header. Using exponential backoff: {delay} seconds...")
-
+                tqdm.write(f"The request failed with an error {response.status_code}, retrying immediately")
+        except requests.exceptions.Timeout:
+            delay = base_delay * (3 ** (attempt - 1))
+            tqdm.write(f"Using exponential backoff: {delay} seconds...")
             delay_start = time.time()
             time.sleep(delay)
             delay_end = time.time()
             delay_overall += delay_end-delay_start
             attempt += 1
-            tqdm.write(f"Trying attempt {attempt}...")
-        else:
+            tqdm.write(f"Request timed out for URL: {url}")
+        except requests.exceptions.RequestException as e:
+            delay = base_delay * (3 ** (attempt - 1))
+            tqdm.write(f"Using exponential backoff: {delay} seconds...")
+            delay_start = time.time()
+            time.sleep(delay)
+            delay_end = time.time()
+            delay_overall += delay_end-delay_start
             attempt += 1
-            tqdm.write(f"The request failed with an error {response.status_code}, retrying immediately")
-
-            
-
+            tqdm.write(f"Request failed: {e}")        
     
     tqdm.write(f"Failed {attempt} attempts, quitting now")
     sys.exit(1)
