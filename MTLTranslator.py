@@ -112,16 +112,14 @@ def grammar_police(contentlist):
             {
                 "role": "system",
                 "content": (
-                    "You are a bilingual editor. Your task is to improve sloppy English translations "
-                    "by comparing them with the original Chinese text. Make the English natural, fluent, "
-                    "and faithful to the meaning in Chinese."
+                    "You are a novel editor. Your task is to improve the sloppy machine tranlated English "
+                    "generated from Chinese text. Make the English natural, fluent, and faithful to the meaning in Chinese. "
                 )
             },
             {
                 "role": "user",
                 "content": (
-                    "Original Chinese: 他昨天去了市场。\n"
-                    "Machine Translated English: He go to market yesterday."
+                    f"Machine Translated English: {content}"
                 )
             }
         ]
@@ -131,7 +129,7 @@ def grammar_police(contentlist):
     return contentlist
 
 # Main function
-def main():
+def main(stop_chapter = float('inf')):
     #-------------- START ---------------
     home_url = input("What's the homepage URL (novelbin): ")
     response = scraper.get(home_url)
@@ -143,6 +141,10 @@ def main():
     
 
     """NEED TO CHECK ALL THE ERROR HANDLING"""
+    #Download Some or All Chapters
+    stop = input("Do you want a some (Y) or all chapters (N): ")
+    if stop == 'Y':
+        stop_chapter = int(input("Enter an integer being the number of chapters to download: ")) + 1
 
 
     book = epub.EpubBook()
@@ -191,32 +193,35 @@ def main():
     book.spine = ['nav']
 
     #Find the Latest Chapter for the loading bar
-    latest_elem = soup.find(name='div', class_='l-chapter')
-    pbar = None
-    if latest_elem:
-        latest_link_elem = latest_elem.find(name='a', class_='chapter-title')
-        if latest_link_elem is None:
-            print("Last chapter link was not found, thus loading bar is unavailable")
-        else:
-            attribute = 'title'
-            latest_link = latest_link_elem.get(attribute)
-            if latest_link:
-                match = re.search(r'\d+', latest_link)
-                if match:
-                    final_chap = int(match.group())
-                    pbar = tqdm(total=final_chap)
-                else:
-                    print("Last chapter number was not found, thus loading bar is unavailable")
+    if not stop == 'Y':
+        latest_elem = soup.find(name='div', class_='l-chapter')
+        pbar = None
+        if latest_elem:
+            latest_link_elem = latest_elem.find(name='a', class_='chapter-title')
+            if latest_link_elem is None:
+                print("Last chapter link was not found, thus loading bar is unavailable")
             else:
-                print(f"Latest chapter attribute (\'{attribute}\') not found, what follows is the latest element")
-                print(f"\n\n{latest_elem}")
+                attribute = 'title'
+                latest_link = latest_link_elem.get(attribute)
+                if latest_link:
+                    match = re.search(r'\d+', latest_link)
+                    if match:
+                        final_chap = int(match.group())
+                        pbar = tqdm(total=final_chap)
+                    else:
+                        print("Last chapter number was not found, thus loading bar is unavailable")
+                else:
+                    print(f"Latest chapter attribute (\'{attribute}\') not found, what follows is the latest element")
+                    print(f"\n\n{latest_elem}")
+        else:
+            print("Latest element was not found, thus loading bar is unavailable")
     else:
-        print("Latest element was not found, thus loading bar is unavailable")
+        pbar = tqdm(total=(stop_chapter-1))
 
 
     next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
     i = 1
-    while not next_chapter is None:
+    while not next_chapter is None and i != stop_chapter:
         #-------------- Get Chapter & Next Link --------------
         contentlist = fetch_text(next_chapter,i)
         #contentlist = grammar_police(contentlist)
