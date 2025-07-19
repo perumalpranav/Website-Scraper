@@ -144,7 +144,19 @@ def grammar_police(contentlist):
     return contentlist
 
 # Main function
-def main(stop_chapter = float('inf')):
+def main():
+    #Check if in Royalroad or NovelBin Mode
+    mode = None
+    for arg in sys.argv:
+        mode = arg
+
+    if not (mode == '-rr' or mode == '-nbin'):
+        print("\nPass the mode that you would like to use ('rr' or 'nbin') as a part of your call, like so")
+        print("=" * 60)
+        print("python MTLTranslator.py -rr")
+        print("=" * 60, end='\n\n')
+        sys.exit(1)
+
     #-------------- START ---------------
     home_url = input("What's the homepage URL (novelbin): ")
     response = scraper.get(home_url)
@@ -170,7 +182,9 @@ def main(stop_chapter = float('inf')):
 
     #-------------- Set Title --------------
     """
-    TODO: Implementation of the Royal Road Upheaval Author Name
+    TODO: Implementation of the Royal Road Upheaval Title
+
+    soup.find(name='div', class_='fic-title').find_children('h1')
     """
 
     title_elem = soup.find(name='h3', class_='title')
@@ -189,6 +203,7 @@ def main(stop_chapter = float('inf')):
     #-------------- Set Cover Image --------------
     """
     TODO: Image Element for Royal Road
+    img_elem = soup.find(name='div', class_='cover-art-container').find_children(class_='thumbnail inline-block')
     if img_elem and 'src' in img_elem.attrs:
         img_url = img_elem['src']
         img_response = requests.get(img_url)
@@ -218,6 +233,8 @@ def main(stop_chapter = float('inf')):
     #-------------- Set Author --------------
     """
     TODO: Implementation of the Royal Road Upheaval Author Name
+
+    soup.find(name='div', class_='fic-title').find_children('a')
     """
 
     author_elem = soup.find(name='h3', string='Author:').find_next('a')
