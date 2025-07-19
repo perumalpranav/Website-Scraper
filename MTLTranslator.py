@@ -274,6 +274,7 @@ def main():
 
     """
     TODO: Implementation of the Royal Road Upheaval First Read Button
+    next_chapter = soup.find(name='div', class_='fic-header').find_children(name='a', class_='btn btn_primary')
     """
 
     next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
