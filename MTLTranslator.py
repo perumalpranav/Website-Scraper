@@ -36,14 +36,14 @@ def fetch_text(url,i):
                 page_content = response.content
                 soup = BeautifulSoup(page_content, 'html.parser')
 
-                titleelem = soup.find(name='a', class_='chr-title') #find chapter title element
+                titleelem = soup.find(name='a', class_='chr-title') #find chapter title element  titleelem = soup.find(class_='font-white break-word')
                 if titleelem:
                     result[0] = titleelem.get('title')
                 else:
                     result[0] = f'Chapter {i}'
 
 
-                bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
+                bodyelem = soup.find(name='div', class_='chr-c', id='chr-content') #soup.find(class_='chapter-inner chapter-content')
                 if bodyelem:
                     tqdm.write(f'Chapter {i} has been found')
                     inner_html = str(bodyelem)
@@ -59,6 +59,21 @@ def fetch_text(url,i):
                 else:
                     result[2] = None 
                     tqdm.write("No next chapter found.")
+
+                """
+                TODO: Implementation of the Royal Road Upheaval Next Chapter Button
+                nelems = soup.find_all(class_='btn btn-primary col-xs-12')
+                for n in nelems:
+                    if(n.text.strip() == "Next Chapter"):
+                        nextelem = n
+                        break
+
+                if nextelem:
+                    try:
+                        result[2] = "https://www.royalroad.com" + nextelem['href']  #CHANGE THIS FOR OTHER WEBSITES
+                    except KeyError:
+                        result[2] = "bad url"
+                """
 
                 return result
             elif response.status_code in (429, 503):
@@ -154,6 +169,10 @@ def main(stop_chapter = float('inf')):
     book.set_language('en')
 
     #-------------- Set Title --------------
+    """
+    TODO: Implementation of the Royal Road Upheaval Author Name
+    """
+
     title_elem = soup.find(name='h3', class_='title')
     if title_elem is None:
         ans = input("TITLE NOT FOUND, would you like to manually enter it (Y/N): ")
@@ -168,6 +187,20 @@ def main(stop_chapter = float('inf')):
     book.set_title(book_title) 
 
     #-------------- Set Cover Image --------------
+    """
+    TODO: Image Element for Royal Road
+    if img_elem and 'src' in img_elem.attrs:
+        img_url = img_elem['src']
+        img_response = requests.get(img_url)
+        if img_response.status_code == 200:
+            cover_image = img_response.content
+            print("Image Found")
+        else:
+            print("Failed to download image:", img_url)
+    else:
+        print("No image found on the webpage.")
+    """
+
     img_elem = soup.find(name='img', class_='lazy')
     response = scraper.get(img_elem.get('data-src')) #or 'src' depending on JS utilization
     if response.status_code == 200:
@@ -181,8 +214,12 @@ def main(stop_chapter = float('inf')):
         book.set_cover('cover.jpg', output.read())
     else:
         print(f"The request for the image failed with an error {response.status_code}")
-    
+
     #-------------- Set Author --------------
+    """
+    TODO: Implementation of the Royal Road Upheaval Author Name
+    """
+
     author_elem = soup.find(name='h3', string='Author:').find_next('a')
     book.add_author(author_elem.text)
 
@@ -218,6 +255,9 @@ def main(stop_chapter = float('inf')):
     else:
         pbar = tqdm(total=(stop_chapter-1))
 
+    """
+    TODO: Implementation of the Royal Road Upheaval First Read Button
+    """
 
     next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
     i = 1
@@ -262,7 +302,7 @@ def main(stop_chapter = float('inf')):
     
     overall_end = time.time() #End Overall Timer
 
-    print("Mission Complete");
+    print("Mission Complete")
 
     print(f"\nTotal time taken: {(overall_end-overall_start):.2f} seconds")
     print(f"Time spent on delay: {delay_overall:.2f} seconds")

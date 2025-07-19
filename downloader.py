@@ -135,7 +135,7 @@ def main():
     # Write to the file
     epub.write_epub(bookFile, book, {})  
 
-    print("Mission Complete");
+    print("Mission Complete")
     print("*Remember to move the file from this directory to downloads*")
 
 # Call the main function
