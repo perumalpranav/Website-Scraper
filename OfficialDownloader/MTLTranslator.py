@@ -17,11 +17,15 @@ import re
 import time
 from tqdm import tqdm
 
+#Custom Created Packages
+from processors.novelbin import NovelBin
+from processors.royalroad import RoyalRoad
+
 scraper = cloudscraper.create_scraper()
 delay_overall = 0
 
 # Function to fetch text from a given URL
-def fetch_text(url,i):
+def fetch_text(url,i,website):
     #return ['Chapter Title','chapter content','URL of next chapter']
     result = ['','','']
     global delay_overall
@@ -53,29 +57,20 @@ def fetch_text(url,i):
                     tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
                     continue
 
-                next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
-                if next_chap_button and not next_chap_button.has_attr("disabled"):        
-                    result[2] = next_chap_button.get('href')
-                else:
-                    result[2] = None 
+                
+                next_chapter_link = website.find_next_chapter(soup)
+                print(f"New methodology found this next_chapter_link: {next_chapter_link}")
+                result[2] = next_chapter_link
+                if next_chapter_link == None:
                     tqdm.write("No next chapter found.")
-
+                
+            
                 """
-                TODO: Implementation of the Royal Road Upheaval Next Chapter Button
-                nelems = soup.find_all(class_='btn btn-primary col-xs-12')
-                for n in nelems:
-                    if(n.text.strip() == "Next Chapter"):
-                        nextelem = n
-                        break
-
-                if nextelem:
-                    try:
-                        result[2] = "https://www.royalroad.com" + nextelem['href']  #CHANGE THIS FOR OTHER WEBSITES
-                    except KeyError:
-                        result[2] = "bad url"
+                TODO: Test of the Royal Road Upheaval Next Chapter Button
                 """
 
                 return result
+            
             elif response.status_code in (429, 503):
                 retry_after = response.headers.get("Retry-After")
                 if retry_after:
@@ -144,21 +139,28 @@ def grammar_police(contentlist):
     return contentlist
 
 # Main function
-def main():
+def main(stop_chapter = float('inf')):
     #Check if in Royalroad or NovelBin Mode
     mode = None
     for arg in sys.argv:
         mode = arg
 
-    if not (mode == '-rr' or mode == '-nbin'):
-        print("\nPass the mode that you would like to use ('rr' or 'nbin') as a part of your call, like so")
-        print("=" * 60)
-        print("python MTLTranslator.py -rr")
-        print("=" * 60, end='\n\n')
-        sys.exit(1)
+    match mode:
+        case "-rr":
+            website = RoyalRoad('RoyalRoad') 
+        case "-nbin":
+            website = NovelBin('Novel Bin')
+
+        case _:
+            print("\nPass the mode that you would like to use ('rr' or 'nbin') as a part of your call, like so")
+            print("=" * 60)
+            print("python MTLTranslator.py -rr")
+            print("=" * 60, end='\n\n')
+            sys.exit(1)  
 
     #-------------- START ---------------
-    home_url = input("What's the homepage URL (novelbin): ")
+    home_url = input(f"What's the homepage URL ({website.domain_name}): ")
+    website.base_url = home_url
     response = scraper.get(home_url)
     if response.status_code != 200:
         print(f"The request for the URL failed with an error {response.status_code}, {type(response.status_code)}")
@@ -173,51 +175,20 @@ def main():
     if stop == 'Y':
         stop_chapter = int(input("Enter an integer being the number of chapters to download: ")) + 1
 
-
-    book = epub.EpubBook()
-
     #-------------- Set Metadata --------------
+    book = epub.EpubBook()
     book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
     book.set_language('en')
 
     #-------------- Set Title --------------
-    """
-    TODO: Implementation of the Royal Road Upheaval Title
 
-    soup.find(name='div', class_='fic-title').find_children('h1')
-    """
-
-    title_elem = soup.find(name='h3', class_='title')
-    if title_elem is None:
-        ans = input("TITLE NOT FOUND, would you like to manually enter it (Y/N): ")
-        if ans == 'y' or ans == 'Y':
-            title = input("Enter Book Title: ")
-        else:
-            print("Quitting...")
-            sys.exit(0)
-    else:
-        book_title = title_elem.text
-
+    book_title = website.find_title(soup=soup)
     book.set_title(book_title) 
 
     #-------------- Set Cover Image --------------
-    """
-    TODO: Image Element for Royal Road
-    img_elem = soup.find(name='div', class_='cover-art-container').find_children(class_='thumbnail inline-block')
-    if img_elem and 'src' in img_elem.attrs:
-        img_url = img_elem['src']
-        img_response = requests.get(img_url)
-        if img_response.status_code == 200:
-            cover_image = img_response.content
-            print("Image Found")
-        else:
-            print("Failed to download image:", img_url)
-    else:
-        print("No image found on the webpage.")
-    """
 
-    img_elem = soup.find(name='img', class_='lazy')
-    response = scraper.get(img_elem.get('data-src')) #or 'src' depending on JS utilization
+    img_link = website.find_cover_image(soup)
+    response = scraper.get(img_link)
     if response.status_code == 200:
         image = Image.open(BytesIO(response.content)).convert("RGB")
         image = image.resize((400, 600), Image.LANCZOS)
@@ -231,21 +202,16 @@ def main():
         print(f"The request for the image failed with an error {response.status_code}")
 
     #-------------- Set Author --------------
-    """
-    TODO: Implementation of the Royal Road Upheaval Author Name
-
-    soup.find(name='div', class_='fic-title').find_children('a')
-    """
-
-    author_elem = soup.find(name='h3', string='Author:').find_next('a')
-    book.add_author(author_elem.text)
+        
+    author = website.find_author_name(soup)
+    book.add_author(author)
 
     #-------------- Build the Chapters --------------
     overall_start = time.time() #Start Overall Timer
 
     toc = []
     book.spine = ['nav']
-
+    """TODO: Latest Chapter for RoyalRoad PBar Number"""
     #Find the Latest Chapter for the loading bar
     if not stop == 'Y':
         latest_elem = soup.find(name='div', class_='l-chapter')
@@ -272,16 +238,13 @@ def main():
     else:
         pbar = tqdm(total=(stop_chapter-1))
 
-    """
-    TODO: Implementation of the Royal Road Upheaval First Read Button
-    next_chapter = soup.find(name='div', class_='fic-header').find_children(name='a', class_='btn btn_primary')
-    """
 
-    next_chapter = soup.find(name='a', class_='btn-read-now').get('href')
+    next_chapter = website.find_first_read(soup=soup)
     i = 1
     while not next_chapter is None and i != stop_chapter:
         #-------------- Get Chapter & Next Link --------------
-        contentlist = fetch_text(next_chapter,i)
+        """TODO: CHANGE FETCH_TEXT TO BE WEBSITE SPECIFIC"""
+        contentlist = fetch_text(next_chapter,i,website)
         #contentlist = grammar_police(contentlist)
 
         #-------------- Create a chapter --------------

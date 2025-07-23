@@ -1,2 +1,5 @@
 #For the API keys that will be used for 'translation'
 .env
+
+#Ignore Mac Extra Files
+.DS_Store
