@@ -39,8 +39,18 @@ class NovelBin(WebsiteStructure):
 
     #Find Next Chapter (From a chapter)    
     def find_next_chapter(self, soup):
-        next_chap_button = soup.find(name='a', id='next_chap', class_='btn btn-success')
+        next_chap_button = soup.find(name='a', id='next_chap', class_=['btn', 'btn-success'])
         if next_chap_button and not next_chap_button.has_attr("disabled"):        
             return next_chap_button.get('href')
         else:
-            return None 
+            return None
+        
+    #Find Chapter Title (From a chapter)    
+    def find_chapter_title(self, soup, i):
+        titleelem = soup.find(name='a', class_='chr-title')
+        return titleelem.get('title') if titleelem else f'Chapter {i}'
+    
+    #Find Chapter Text (From a chapter)    
+    def find_chapter_text(self, soup):
+        bodyelem = soup.find(name='div', class_='chr-c', id='chr-content')
+        return str(bodyelem) if bodyelem else None

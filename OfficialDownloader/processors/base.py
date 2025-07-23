@@ -25,8 +25,13 @@ class WebsiteStructure:
     def find_next_chapter(self, data):
         raise NotImplementedError("Subclasses must implement this method.")
 
-
-
+    #Find Chapter Title (From a chapter)    
+    def find_chapter_title(self, data):
+        raise NotImplementedError("Subclasses must implement this method.")
+    
+    #Find Chapter Text (From a chapter)    
+    def find_chapter_text(self, data):
+        raise NotImplementedError("Subclasses must implement this method.")
 
 
 

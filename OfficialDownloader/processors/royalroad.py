@@ -44,7 +44,7 @@ class RoyalRoad(WebsiteStructure):
 
     #Find Next Chapter (From a chapter)    
     def find_next_chapter(self, soup):
-        next_chap_buttons = soup.find_all(class_='btn btn-primary col-xs-12')
+        next_chap_buttons = soup.find_all(class_=['btn', 'btn-primary', 'col-xs-12'])
         for n in next_chap_buttons:
             if(n.text.strip() == "Next Chapter"):
                 nextelem = n
@@ -56,3 +56,13 @@ class RoyalRoad(WebsiteStructure):
                 return f"https://www.royalroad.com{end}" 
             
         return None
+    
+    #Find Chapter Title (From a chapter)    
+    def find_chapter_title(self, soup, i):
+        titleelem = soup.find(name='div', class_=['row', 'fic_header']).find('h1')
+        return titleelem.text if titleelem else f'Chapter {i}'
+    
+    #Find Chapter Text (From a chapter)    
+    def find_chapter_text(self, soup):
+        bodyelem = soup.find(class_=['chapter-inner', 'chapter-content'])
+        return str(bodyelem) if bodyelem else None

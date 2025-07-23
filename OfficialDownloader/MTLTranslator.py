@@ -40,18 +40,14 @@ def fetch_text(url,i,website):
                 page_content = response.content
                 soup = BeautifulSoup(page_content, 'html.parser')
 
-                titleelem = soup.find(name='a', class_='chr-title') #find chapter title element  titleelem = soup.find(class_='font-white break-word')
-                if titleelem:
-                    result[0] = titleelem.get('title')
-                else:
-                    result[0] = f'Chapter {i}'
+                """TODO: Check if title is in first line, else add it to body text"""
+                result[0] = website.find_chapter_title(soup, i)
 
 
-                bodyelem = soup.find(name='div', class_='chr-c', id='chr-content') #soup.find(class_='chapter-inner chapter-content')
-                if bodyelem:
+                body_text = website.find_chapter_text(soup)
+                if body_text:
                     tqdm.write(f'Chapter {i} has been found')
-                    inner_html = str(bodyelem)
-                    result[1] = inner_html
+                    result[1] = body_text
                 else:
                     attempt += 1
                     tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
@@ -59,7 +55,6 @@ def fetch_text(url,i,website):
 
                 
                 next_chapter_link = website.find_next_chapter(soup)
-                print(f"New methodology found this next_chapter_link: {next_chapter_link}")
                 result[2] = next_chapter_link
                 if next_chapter_link == None:
                     tqdm.write("No next chapter found.")
