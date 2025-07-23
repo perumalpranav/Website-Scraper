@@ -8,7 +8,7 @@ import cloudscraper
 import requests
 from bs4 import BeautifulSoup  # For parsing HTML and XML documents
 from ebooklib import epub
-import ollama
+#import ollama
 from PIL import Image
 from io import BytesIO
 import sys
@@ -43,7 +43,6 @@ def fetch_text(url,i,website):
                 """TODO: Check if title is in first line, else add it to body text"""
                 result[0] = website.find_chapter_title(soup, i)
 
-
                 body_text = website.find_chapter_text(soup)
                 if body_text:
                     tqdm.write(f'Chapter {i} has been found')
@@ -52,7 +51,6 @@ def fetch_text(url,i,website):
                     attempt += 1
                     tqdm.write(f'ALERT ALERT Chapter {i} text has NOT been found, trying attempt {attempt}...')
                     continue
-
                 
                 next_chapter_link = website.find_next_chapter(soup)
                 result[2] = next_chapter_link
@@ -81,27 +79,24 @@ def fetch_text(url,i,website):
                 delay_overall += delay_end-delay_start
                 attempt += 1
                 tqdm.write(f"Trying attempt {attempt}...")
+
             else:
                 attempt += 1
                 tqdm.write(f"The request failed with an error {response.status_code}, retrying immediately")
-        except requests.exceptions.Timeout:
-            delay = base_delay * (3 ** (attempt - 1))
-            tqdm.write(f"Using exponential backoff: {delay} seconds...")
-            delay_start = time.time()
-            time.sleep(delay)
-            delay_end = time.time()
-            delay_overall += delay_end-delay_start
-            attempt += 1
-            tqdm.write(f"Request timed out for URL: {url}")
+
         except requests.exceptions.RequestException as e:
             delay = base_delay * (3 ** (attempt - 1))
             tqdm.write(f"Using exponential backoff: {delay} seconds...")
             delay_start = time.time()
             time.sleep(delay)
             delay_end = time.time()
-            delay_overall += delay_end-delay_start
+            delay_overall += delay_end - delay_start
             attempt += 1
-            tqdm.write(f"Request failed: {e}")        
+
+            if isinstance(e, requests.exceptions.Timeout):
+                tqdm.write(f"Request timed out for URL: {url}")
+            else:
+                tqdm.write(f"Request failed: {e}")  
     
     tqdm.write(f"Failed {attempt} attempts, quitting now")
     sys.exit(1)
@@ -140,6 +135,7 @@ def main(stop_chapter = float('inf')):
     for arg in sys.argv:
         mode = arg
 
+    #Instantiate Website Parser based on the mode
     match mode:
         case "-rr":
             website = RoyalRoad('RoyalRoad') 
