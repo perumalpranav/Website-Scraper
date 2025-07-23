@@ -57,11 +57,6 @@ def fetch_text(url,i,website):
                 if next_chapter_link == None:
                     tqdm.write("No next chapter found.")
                 
-            
-                """
-                TODO: Test of the Royal Road Upheaval Next Chapter Button
-                """
-
                 return result
             
             elif response.status_code in (429, 503):
@@ -234,7 +229,6 @@ def main(stop_chapter = float('inf')):
     i = 1
     while not next_chapter is None and i != stop_chapter:
         #-------------- Get Chapter & Next Link --------------
-        """TODO: CHANGE FETCH_TEXT TO BE WEBSITE SPECIFIC"""
         contentlist = fetch_text(next_chapter,i,website)
         #contentlist = grammar_police(contentlist)
 
